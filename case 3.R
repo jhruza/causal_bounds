@@ -62,7 +62,7 @@ for (param in obj_full$parameters){
 nval<-V(graph_full)$nvals[3]
 result_marg<-c(lower = 0, upper =0)
 for (val in 1:nval) {
-    # filter values condition S=s
+    # filter prob_list conditioned on S=s
     index <- grep(paste0("^p.",val-1, "._."), names(prob_list))
     marg_p<-prob_list[index]
 
