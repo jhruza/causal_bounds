@@ -35,15 +35,17 @@ obj_marg <- analyze_graph(graph_marg, constraints = NULL, effectt = to_bound)
 bounds_marg <- optimize_effect_2(obj_marg)
 cat(latex_bounds(bounds = bounds_marg$bounds, parameters = obj_marg$parameters, prob.sym = "P"))
 
-
+# generate valid but random conditinal probabilities based on graph 
 p <- valid_p_sample(obj_full)
 
 
 rightvars <- attr(obj_full$parameters, "rightvars")
 condvars <-attr(obj_full$parameters, "condvars")
 
+
 prob_list <- setNames(as.list(rep(NA, length(obj_full$parameters))), obj_full$parameters)
 
+# create list that matches arguments of bounds_function
 for (param in obj_full$parameters){
     x<- as.numeric(substring(param, 2, 2))
     s<- as.numeric(substring(param, 3, 3))
@@ -54,17 +56,20 @@ for (param in obj_full$parameters){
     # condition on Z
     cond_p<-joint_p/subset(p$Z, outcome == z)[ ,"p"]
     prob_list[param] <- cond_p
-
 } 
-
 
 # nvals of S
 nval<-V(graph_full)$nvals[3]
 result_marg<-c(lower = 0, upper =0)
 for (val in 1:nval) {
+    # filter values condition S=s
     index <- grep(paste0("^p.",val-1, "._."), names(prob_list))
     marg_p<-prob_list[index]
+
+    # renaming list so parameters match that of bounds_function
     names(marg_p) <- sapply(names(marg_p), function(x) paste0(substr(x, 1, 2), substr(x, 4, nchar(x))))
+    
+    # result_marg + P(s)*Lowerbound(s)
     result_marg <- result_marg + sum(subset(p$Ur)[ ,"p"]*subset(p$S, outcome == val-1)[ ,"p"]) * do.call(bounds_marg$bounds_function, marg_p)
 }
 
