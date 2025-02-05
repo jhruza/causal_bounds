@@ -69,7 +69,7 @@ for (val in 1:nval) {
     # renaming list so parameters match that of bounds_function
     names(marg_p) <- sapply(names(marg_p), function(x) paste0(substr(x, 1, 2), substr(x, 4, nchar(x))))
     
-    # result_marg + P(s)*Lowerbound(s)
+    # result_marg + P(s)*bounds(s)
     result_marg <- result_marg + sum(subset(p$Ur)[ ,"p"]*subset(p$S, outcome == val-1)[ ,"p"]) * do.call(bounds_marg$bounds_function, marg_p)
 }
 
