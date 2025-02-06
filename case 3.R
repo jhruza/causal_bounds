@@ -64,8 +64,8 @@ result_marg<-c(lower = 0, upper =0)
 for (val in 1:nval) {
     # filter prob_list conditioned on S=s
     index <- grep(paste0("^p.",val-1, "._."), names(prob_list))
-    marg_p<-prob_list[index]
-
+    marg_p<-prob_list[index] 
+    marg_p <- lapply(marg_p, function(x) x / sum(subset(p$Ur)[ ,"p"]*subset(p$S, outcome == val-1)[ ,"p"]))
     # renaming list so parameters match that of bounds_function
     names(marg_p) <- sapply(names(marg_p), function(x) paste0(substr(x, 1, 2), substr(x, 4, nchar(x))))
     
@@ -78,3 +78,13 @@ result_full<- do.call(bounds_full$bounds_function, prob_list)
 print(result_full)
 print(result_marg)
 
+    index <- grep(paste0("^p.",0, "._."), names(prob_list))
+    marg_p <- unlist(prob_list[index])
+
+    index <- grep(paste0("^p.",1, "._."), names(prob_list))
+    marg_p <- marg_p + unlist(prob_list[index])
+
+    # renaming list so parameters match that of bounds_function
+    # names(marg_p) <- sapply(names(marg_p), function(x) paste0(substr(x, 1, 2), substr(x, 4, nchar(x))))
+    marg_p <- setNames(as.list(marg_p), sapply(names(marg_p), function(x) paste0(substr(x, 1, 2), substr(x, 4, nchar(x)))))
+    print(do.call(bounds_marg$bounds_function, marg_p))
