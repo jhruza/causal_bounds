@@ -65,6 +65,7 @@ for (val in 1:nval) {
     # filter prob_list conditioned on S=s
     index <- grep(paste0("^p.",val-1, "._."), names(prob_list))
     marg_p<-prob_list[index] 
+    # get marginal probability of S=s
     marg_p <- lapply(marg_p, function(x) x / sum(subset(p$Ur)[ ,"p"]*subset(p$S, outcome == val-1)[ ,"p"]))
     # renaming list so parameters match that of bounds_function
     names(marg_p) <- sapply(names(marg_p), function(x) paste0(substr(x, 1, 2), substr(x, 4, nchar(x))))

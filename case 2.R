@@ -5,7 +5,7 @@ source("helper_function.R")
 graph_full <- initialize_graph(igraph::graph_from_literal(Z -+ X, S-+X, X-+ Y, 
                                     Ur -+ S, Ur -+ X, Ur -+ Y))
 # print(V(graph))
-# plot(graph)
+plot(graph_full)
 # Assuming V(graph)$name = ["Z", "X", "S", "Y", "Ur"]
 V(graph_full)$leftside <- c(1, 0, 0, 0, 0)
 V(graph_full)$latent   <- c(0, 0, 0, 0, 1)
@@ -63,6 +63,9 @@ result_marg<-c(lower = 0, upper =0)
 for (val in 1:nval) {
     index <- grep(paste0("^p.",val-1, "._."), names(prob_list))
     marg_p<-prob_list[index]
+    # get marginal probability of S=s
+    marg_p <- lapply(marg_p, function(x) x / sum(subset(p$Ur)[ ,"p"]*subset(p$S, outcome == val-1)[ ,"p"]))
+
     names(marg_p) <- sapply(names(marg_p), function(x) paste0(substr(x, 1, 2), substr(x, 4, nchar(x))))
     result_marg <- result_marg + sum(subset(p$Ur)[ ,"p"]*subset(p$S, outcome == val-1)[ ,"p"]) * do.call(bounds_marg$bounds_function, marg_p)
 }
