@@ -1,13 +1,12 @@
-#generate random but valid probabilities based on nvals and names
-valid_p_sample <- function(obj){
-    nvals <- V(obj$graph)$nvals
-    names <- V(obj$graph)$name
-    parameters <- obj$parameters
+#generate random but valid probabilities based on nvals and names of a graph
+valid_p_sample <- function(graph, return_joint=FALSE){
+    nvals <- V(graph)$nvals
+    names <- V(graph)$name
 
     prob <- list()
-    for (i in 1:vcount(obj$graph)){
-      incoming_edges <- incident (obj$graph, names[i], mode="in")
-      incoming_names <- ends(obj$graph, incoming_edges)[,1]
+    for (i in 1:vcount(graph)){
+      incoming_edges <- incident (graph, names[i], mode="in")
+      incoming_names <- ends(graph, incoming_edges)[,1]
       incoming_positions <- which(names %in% incoming_names)
 
       col_names <- c("outcome", incoming_names ,"p")
@@ -33,5 +32,41 @@ valid_p_sample <- function(obj){
         }
       prob[[names[i]]] <- df
     }
-return(prob)
+if (return_joint){
+  seq_list <- lapply(nvals, function(x) seq(0, x - 1))
+  grid <- do.call(expand.grid, seq_list)
+  colnames(grid) <- names
+  grid$p <- NA
+  for (row in seq_len(nrow(grid))){
+    p <- 1
+    for (node in names){
+      node_df <- prob[[node]]
+      # Filter conditions - start with matching the outcome
+      conditions <- node_df$outcome == grid[row, node]
+
+      # Add conditions for parent values
+      parent_cols <- setdiff(colnames(node_df), c("outcome", "p"))
+      for (parent in parent_cols) {
+        parent_val <- grid[row, parent]
+        conditions <- conditions & node_df[[parent]] == parent_val
+      }
+
+      # Get probability from the matching row
+      matched_prob <- node_df$p[conditions]
+
+      # Multiply to get joint probability
+      if (length(matched_prob) == 1) {
+        p <- p * matched_prob
+      } else {
+        stop(paste("Error finding unique probability for node", node))
+      }
+    }
+    grid$p[row] <- p
+  }
+  return(grid)
 }
+else {
+  return(prob)
+}
+}
+
