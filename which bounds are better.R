@@ -93,7 +93,7 @@ for (x in 0:(V(graph_full)["X"]$nvals-1)){
     y <- as.numeric(substring(param, 3, 3))
     z <- as.numeric(substring(param, 5, 5))
 
-    #joint observed distribution marged over Ur conditioned on z P(A=a, Y=y, Z=z)
+    #joint observed distribution marged over Ur  P(A=a, Y=y, Z=z, X=x)
     joint_p<- sum(subset(sample_joint, A == a & Y == y & Z == z & X==x)[, "p"])
     
     #joint observed distribution conditioned on Z=z and X=x .
@@ -103,7 +103,7 @@ for (x in 0:(V(graph_full)["X"]$nvals-1)){
   # calculate p(X=x)
   p_x <- sum(subset(sample_joint, X==x)[ , "p"]) # nolint
 
-  result_cond <- p_x * do.call(bounds$bounds_function, prob_list)
+  result_cond <- result_cond + p_x * do.call(bounds$bounds_function, prob_list)
 }
 
 # calculate true estimand E(f(X)) = sum_a{p(Y(A=a)=1, f(X)=a)}
