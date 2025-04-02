@@ -2,8 +2,8 @@ library(causaloptim)
 source("helper_function.R")
 
 #define parameters
-N_A <- 3
-N_X <- 6
+N_A <- 2
+N_X <- 3
 N_Y <- 2
 N_Z <- 2
 N_Ur <- 2
@@ -11,8 +11,7 @@ N_Ur <- 2
 f <- function(x, preimage = FALSE) {
   mapping <- list(
     `0` = c(0, 1),
-    `1` = c(2, 3),
-    `2` = c(4, 5)
+    `1` = c(2)
   )
   
   if (preimage) {
@@ -176,9 +175,36 @@ calculate_bound_reduced <- function(sample_joint){
 
 
 
+# calculate tight bounds the full graph
+calculate_tight_bounds <- function(sample_joint){
+  bound_tight <- paste0("p{Y(A = ", sapply(0:(N_X-1), f), ") = 1; X = ", 0:(N_X-1), "}", collapse = " + ") #nolint
+  obj_tight <- analyze_graph(graph_full, constraints = NULL, effectt = bound_tight)
+  bounds_tight <- optimize_effect_2(obj_tight)
+
+  #we need the prob_list_tight in the form of P(A = a, X = x, Y = y | Z = z)
+
+  prob_list_tight <- setNames(as.list(rep(NA, length(obj_tight$parameters))), obj_tight$parameters)
+
+  for (param in names(prob_list_tight)){
+    a <- as.numeric(substring(param, 2, 2))
+    x <- as.numeric(substring(param, 3, 3))
+    y <- as.numeric(substring(param, 4, 4))
+    z <- as.numeric(substring(param, 6, 6))
+
+    prob_list_tight[param] <- sum(subset(sample_joint, A == a & X == x & Y == y & Z == z)[, "p"]) / 
+                              sum(subset(sample_joint, Z == z)[, "p"])
+
+  }
+  result_tight <- do.call(bounds_tight$bounds_function, prob_list_tight)
+  return(result_tight)
+}
+
+
+
 #sample from full graph
 sample_joint <- valid_p_sample(graph_full, return_joint = TRUE)
 
 calculate_true_estimand(sample_joint)
 calculate_bound_reduced(sample_joint)
 calculate_bound_conditional(sample_joint)
+calculate_tight_bounds(sample_joint)
