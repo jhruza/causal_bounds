@@ -2,18 +2,22 @@ library(causaloptim)
 source("helper_function.R")
 
 #define parameters
-N_A <- 2
-N_X <- 3
+N_A <- 4
+N_X <- 10
 N_Y <- 2
 N_Z <- 2
 N_Ur <- 2
 
+simulation_n <- 10000
+
+#ITR function
 f <- function(x, preimage = FALSE) {
   mapping <- list(
     `0` = c(0, 1),
-    `1` = c(2)
+    `1` = c(2, 3, 8, 9),
+    `2` = c(4, 5, 6, 7)
   )
-  
+
   if (preimage) {
     for (key in names(mapping)) {
       if (x == as.numeric(key)) {
@@ -73,10 +77,6 @@ V(graph_reduced)$nvals    <- c(N_Z, N_A, N_Y, N_Ur, N_A)
 
 
 
-
-# calculate boudns using approach where we condition on X
-#calculate bounds for each value of A that 
-calculate_bound_conditional <- function(sample_joint){
   bound_a<-list()
   obj_a<-list()
   bounds_a<-list()
@@ -85,6 +85,10 @@ calculate_bound_conditional <- function(sample_joint){
       obj_a[[paste0(a)]]<- analyze_graph(graph_cond, constraints = NULL, effectt = bound_a[paste0(a)])
       bounds_a[[paste0(a)]] <- optimize_effect_2(obj_a[[paste0(a)]])
   }
+
+# calculate boudns using approach where we condition on X
+#calculate bounds for each value of A that 
+calculate_bound_conditional <- function(sample_joint){
 
   result_cond <- c(lower = 0, upper = 0)
   # marginalize over X
@@ -145,11 +149,11 @@ calculate_true_estimand <- function(sample_joint) {
   return(result_estimand)
 }
 
-# calculate bounds by reducing the full graph
-calculate_bound_reduced <- function(sample_joint){
   bound_reduced <- paste0("p{Y(A = ", 0: (V(graph_full)["A"]$nvals - 1), ") = 1; B = ", 0: (V(graph_full)["A"]$nvals - 1),"}", collapse = " + ") #nolint
   obj_reduced <- analyze_graph(graph_reduced, constraints = NULL, effectt = bound_reduced)
   bounds_reduced <- optimize_effect_2(obj_reduced)
+# calculate bounds by reducing the full graph
+calculate_bound_reduced <- function(sample_joint){
 
   #we need the prob_list_reduced in the form of P(A = a, Y = a, B = b | Z = z)
   prob_list_reduced <- setNames(as.list(rep(NA, length(obj_reduced$parameters))), obj_reduced$parameters)
@@ -175,7 +179,7 @@ calculate_bound_reduced <- function(sample_joint){
 
 
 
-# calculate tight bounds the full graph
+# calculate tight bounds for the full graph
 calculate_tight_bounds <- function(sample_joint){
   bound_tight <- paste0("p{Y(A = ", sapply(0:(N_X-1), f), ") = 1; X = ", 0:(N_X-1), "}", collapse = " + ") #nolint
   obj_tight <- analyze_graph(graph_full, constraints = NULL, effectt = bound_tight)
@@ -204,7 +208,86 @@ calculate_tight_bounds <- function(sample_joint){
 #sample from full graph
 sample_joint <- valid_p_sample(graph_full, return_joint = TRUE)
 
-calculate_true_estimand(sample_joint)
-calculate_bound_reduced(sample_joint)
-calculate_bound_conditional(sample_joint)
-calculate_tight_bounds(sample_joint)
+print(calculate_true_estimand(sample_joint))
+print(calculate_bound_reduced(sample_joint))
+print(calculate_bound_conditional(sample_joint))
+# print(calculate_tight_bounds(sample_joint))
+
+
+# SINGLE CORE COMPUTING
+# true_estimand<-list()
+# bound_reduced<-list()
+# bound_conditional<-list()
+# pb <- txtProgressBar(min = 0, max = simulation_n, style = 3)
+# for (i in 1:simulation_n){
+#   setTxtProgressBar(pb, i)
+#   sample_joint <- valid_p_sample(graph_full, return_joint = TRUE)
+#   true_estimand[[i]] <- calculate_true_estimand(sample_joint)
+#   bound_reduced[[i]] <- calculate_bound_reduced(sample_joint)
+#   bound_conditional[[i]] <- calculate_bound_conditional(sample_joint)
+# }
+
+# true_estimand_values <- sapply(true_estimand, function(x) x)
+# bound_reduced_lower <- sapply(bound_reduced, function(x) x$lower)
+# bound_reduced_upper <- sapply(bound_reduced, function(x) x$upper)
+# bound_conditional_lower <- sapply(bound_conditional, function(x) x$lower)
+# bound_conditional_upper <- sapply(bound_conditional, function(x) x$upper)
+
+
+
+#parallel computing
+
+library(parallel)
+library(pbapply)
+
+# Define the number of cores to use
+num_cores <- detectCores() - 1  # Use one less than the total number of cores
+
+# Parallelize the simulation
+cl <- makeCluster(num_cores)
+clusterExport(cl, ls())
+clusterEvalQ(cl, library(causaloptim))  # Load necessary libraries on each worker
+
+results <- pblapply(cl=cl, 1:simulation_n, function(i) {
+  sample_joint <- valid_p_sample(graph_full, return_joint = TRUE)
+  return(list(
+    true_estimand = calculate_true_estimand(sample_joint),
+    bound_reduced = calculate_bound_reduced(sample_joint),
+    bound_conditional = calculate_bound_conditional(sample_joint)
+  ))
+})
+
+stopCluster(cl)
+
+#end parallel computing
+
+
+# Extract results
+true_estimand_values <- sapply(results, function(x) x$true_estimand)
+bound_reduced_lower <- sapply(results, function(x) x$bound_reduced$lower)
+bound_reduced_upper <- sapply(results, function(x) x$bound_reduced$upper)
+bound_conditional_lower <- sapply(results, function(x) x$bound_conditional$lower)
+bound_conditional_upper <- sapply(results, function(x) x$bound_conditional$upper)
+
+
+# Compare if true estimand is less than the lower bound
+sum(true_estimand_values < bound_reduced_lower & true_estimand_values > bound_reduced_upper)
+sum(true_estimand_values < bound_conditional_lower & true_estimand_values > bound_conditional_upper)
+
+min(true_estimand_values-bound_reduced_lower)
+min(true_estimand_values-bound_conditional_lower)
+min(bound_reduced_upper-true_estimand_values)
+min(bound_conditional_upper-true_estimand_values)
+
+# Check if the reduced bounds are better 
+sum((bound_reduced_lower - bound_conditional_lower)>1e-10)
+sum((bound_conditional_upper - bound_reduced_upper)>1e-10) 
+
+# Save the variables as an RDS file
+saveRDS(list(
+  true_estimand_values = true_estimand_values,
+  bound_reduced_lower = bound_reduced_lower,
+  bound_reduced_upper = bound_reduced_upper,
+  bound_conditional_lower = bound_conditional_lower,
+  bound_conditional_upper = bound_conditional_upper
+), file = "results.rds")
