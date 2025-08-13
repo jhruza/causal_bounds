@@ -40,9 +40,9 @@ The primary script runs simulations across many randomly generated (but valid) p
 
 - R
 - The `causaloptim` R package.
-- The parallel and pbapply, when using parallel computing.
+- The `parallel` and `pbapply`, when using parallel computing.
 
 You can install the necessary package from CRAN by running the following command in your R console:
 
 ```R
-install.packages("causaloptim")
+install.packages("name_of_package")
