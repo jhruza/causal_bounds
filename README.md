@@ -1,4 +1,3 @@
-======================================================================
  Nonparameteric Bounds for Evaluating the Clinical Utility of
 Treatment Rules - Code Repository
 ======================================================================
